@@ -8,7 +8,7 @@ import (
 type Page struct {
 	pgid  uint64
 	_type uint8 // leaf or internal
-	rows  uint32
+	keys  uint32
 }
 
 func (m *Meta) getNewPageID() uint64 {
@@ -54,7 +54,7 @@ func (db *DB) readPage(pgid uint64) (*Page, error) {
 	p._type = bytes[8]
 
 	// read number of rows
-	p.rows = binary.LittleEndian.Uint32(bytes[9:13])
+	p.keys = binary.LittleEndian.Uint32(bytes[9:13])
 
 	return &p, nil
 }
@@ -88,7 +88,7 @@ func (p *Page) write() []byte {
 	bytes[8] = p._type
 
 	// write number of rows
-	binary.LittleEndian.PutUint32(bytes[9:13], p.rows)
+	binary.LittleEndian.PutUint32(bytes[9:13], p.keys)
 
 	return bytes
 }
@@ -99,14 +99,14 @@ func (p *Page) updateRows(db *DB) (uint32, error) {
 		return 0, err
 	}
 
-	p.rows += 1
+	p.keys += 1
 
 	err = db.writePage(*p)
 	if err != nil {
 		return 0, err
 	}
 
-	return p.rows, nil
+	return p.keys, nil
 }
 
 func (p *Page) MakeRow(key, value []byte) []byte {

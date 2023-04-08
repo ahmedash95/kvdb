@@ -55,7 +55,7 @@ func (b *Bucket) Put(key, value []byte) error {
 		return err
 	}
 
-	k := p.rows
+	k := p.keys
 
 	if k > MAX_KEYS {
 		return fmt.Errorf("max keys reached: %d. current key: %d", MAX_KEYS, k)
@@ -88,7 +88,7 @@ func (b *Bucket) Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	size := p.rows
+	size := p.keys
 
 	b.db.file.Seek(int64(b.db.pageOffset(b.rootpage)+PAGE_HEADER), io.SeekStart)
 
@@ -123,7 +123,7 @@ func (b *Bucket) Scan(call func([]byte, []byte)) error {
 		return err
 	}
 
-	size := p.rows
+	size := p.keys
 
 	b.db.file.Seek(int64(b.db.pageOffset(b.rootpage)+PAGE_HEADER), io.SeekStart)
 
