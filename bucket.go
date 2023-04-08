@@ -61,25 +61,17 @@ func (b *Bucket) Put(key, value []byte) error {
 		return fmt.Errorf("max keys reached: %d. current key: %d", MAX_KEYS, k)
 	}
 
-	// update rows count
-	k, err = p.appendKey(b.db, key)
-	if err != nil {
-		return err
-	}
+	// find position to insert key
+	var keypos uint32
+	// keypos, found := p.findKey(key)
+	// if found {
+	// 	err = p.writeKeyAt(b.db, key, value, keypos)
+	// } else {
+	// keypos = p.lookupKeyPos(key)
+	err = p.insertKey(b.db, key, value, keypos)
+	// }
 
-	// write key
-	bytes := p.MakeRow(key, value)
-
-	// write new key to page
-	offset := b.db.pageOffset(b.rootpage) + p.keyPos(k)
-	b.db.file.Seek(int64(offset), io.SeekStart)
-
-	_, err = b.db.file.Write(bytes)
-	if err != nil {
-		return err
-	}
-
-	return nil
+	return err
 }
 
 func (b *Bucket) Get(key []byte) ([]byte, error) {
@@ -90,26 +82,30 @@ func (b *Bucket) Get(key []byte) ([]byte, error) {
 
 	size := p.nkeys
 
-	b.db.file.Seek(int64(b.db.pageOffset(b.rootpage)+PAGE_HEADER), io.SeekStart)
+	offset := b.db.pageOffset(b.rootpage) + p.recordsOffset()
+	_, err = b.db.file.Seek(int64(offset), io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
 
 	for i := 0; i < int(size); i++ {
 		// read key
-		keybytes := make([]byte, KEY_SIZE)
-		_, err := b.db.file.Read(keybytes)
+		keyBytes := make([]byte, KEY_SIZE)
+		_, err := b.db.file.Read(keyBytes)
 		if err != nil {
 			return nil, err
 		}
 
 		// read value
-		valbytes := make([]byte, VALUE_SIZE)
-		_, err = b.db.file.Read(valbytes)
+		valBytes := make([]byte, VALUE_SIZE)
+		_, err = b.db.file.Read(valBytes)
 		if err != nil {
 			return nil, err
 		}
 
-		keystr := strings.TrimRight(string(keybytes), "\x00")
-		if string(key) == keystr {
-			return []byte(strings.TrimRight(string(valbytes), "\x00")), nil
+		keyStr := strings.TrimRight(string(keyBytes), "\x00")
+		if string(key) == keyStr {
+			return []byte(strings.TrimRight(string(valBytes), "\x00")), nil
 		}
 
 	}
@@ -125,7 +121,8 @@ func (b *Bucket) Scan(call func([]byte, []byte)) error {
 
 	size := p.nkeys
 
-	b.db.file.Seek(int64(b.db.pageOffset(b.rootpage)+PAGE_HEADER), io.SeekStart)
+	offset := b.db.pageOffset(b.rootpage) + p.recordsOffset()
+	b.db.file.Seek(int64(offset), io.SeekStart)
 
 	for i := 0; i < int(size); i++ {
 		// read key

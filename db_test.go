@@ -152,7 +152,7 @@ func TestPutKeys(t *testing.T) {
 	}
 
 	if string(val) != "John Doe" {
-		t.Fatalf("value not correct. expected: %s, got: %s | len %d\n", "John Doe", string(val), len(val))
+		t.Fatalf("value not correct. expected: %s, got: %s", "John Doe", string(val))
 	}
 }
 
