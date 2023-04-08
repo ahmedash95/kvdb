@@ -8,7 +8,17 @@ import (
 type Page struct {
 	pgid  uint64
 	_type uint8 // leaf or internal
-	keys  uint32
+	nkeys uint32
+	keys  [][]byte
+}
+
+func NewPage(pgid uint64) Page {
+	return Page{
+		pgid:  pgid,
+		_type: NODE_TYPE_LEAF,
+		nkeys: 0,
+		keys:  make([][]byte, 0),
+	}
 }
 
 func (m *Meta) getNewPageID() uint64 {
@@ -53,8 +63,20 @@ func (db *DB) readPage(pgid uint64) (*Page, error) {
 	// read page type
 	p._type = bytes[8]
 
-	// read number of rows
-	p.keys = binary.LittleEndian.Uint32(bytes[9:13])
+	// read number of keys
+	p.nkeys = binary.LittleEndian.Uint32(bytes[9:13])
+
+	// read keys
+	p.keys = make([][]byte, p.nkeys)
+	for i := 0; i < int(p.nkeys); i++ {
+		keybytes := make([]byte, KEY_SIZE)
+		_, err := db.file.Read(keybytes)
+		if err != nil {
+			return nil, err
+		}
+
+		p.keys[i] = keybytes
+	}
 
 	return &p, nil
 }
@@ -87,26 +109,38 @@ func (p *Page) write() []byte {
 	// write page type
 	bytes[8] = p._type
 
-	// write number of rows
-	binary.LittleEndian.PutUint32(bytes[9:13], p.keys)
+	// write number of keys
+	binary.LittleEndian.PutUint32(bytes[9:13], p.nkeys)
+
+	keysbytes := make([]byte, KEY_SIZE*p.nkeys)
+	// write keys list
+	for i := 0; i < int(p.nkeys); i++ {
+		keybytes := make([]byte, KEY_SIZE)
+		copy(keybytes, p.keys[i])
+		copy(keysbytes[i*KEY_SIZE:], keybytes)
+	}
+
+	copy(bytes[PAGE_HEADER:], keysbytes)
 
 	return bytes
 }
 
-func (p *Page) updateRows(db *DB) (uint32, error) {
+func (p *Page) appendKey(db *DB, key []byte) (uint32, error) {
 	err := db.seekPage(p.pgid)
 	if err != nil {
 		return 0, err
 	}
 
-	p.keys += 1
+	p.nkeys += 1
+
+	p.keys = append(p.keys, key)
 
 	err = db.writePage(*p)
 	if err != nil {
 		return 0, err
 	}
 
-	return p.keys, nil
+	return p.nkeys, nil
 }
 
 func (p *Page) MakeRow(key, value []byte) []byte {

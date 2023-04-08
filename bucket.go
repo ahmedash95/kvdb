@@ -34,7 +34,7 @@ func newBucket(db *DB, name string) (*Bucket, error) {
 	}
 
 	// write new empty page
-	err := db.writePage(Page{pgid: b.rootpage})
+	err := db.writePage(NewPage(b.rootpage))
 	if err != nil {
 		return nil, err
 	}
@@ -55,14 +55,14 @@ func (b *Bucket) Put(key, value []byte) error {
 		return err
 	}
 
-	k := p.keys
+	k := p.nkeys
 
 	if k > MAX_KEYS {
 		return fmt.Errorf("max keys reached: %d. current key: %d", MAX_KEYS, k)
 	}
 
 	// update rows count
-	k, err = p.updateRows(b.db)
+	k, err = p.appendKey(b.db, key)
 	if err != nil {
 		return err
 	}
@@ -88,7 +88,7 @@ func (b *Bucket) Get(key []byte) ([]byte, error) {
 		return nil, err
 	}
 
-	size := p.keys
+	size := p.nkeys
 
 	b.db.file.Seek(int64(b.db.pageOffset(b.rootpage)+PAGE_HEADER), io.SeekStart)
 
@@ -123,7 +123,7 @@ func (b *Bucket) Scan(call func([]byte, []byte)) error {
 		return err
 	}
 
-	size := p.keys
+	size := p.nkeys
 
 	b.db.file.Seek(int64(b.db.pageOffset(b.rootpage)+PAGE_HEADER), io.SeekStart)
 

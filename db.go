@@ -24,7 +24,13 @@ const (
 
 	// First page after meta page
 	PAGES_OFFSET = HEADER
-	PAGE_HEADER  = 13 // 8 bytes for page id, 1 byte for type, 4 bytes for rows
+
+	// Page header
+	PAGE_ID_BYTES   = 8
+	PAGE_TYPE_BYTES = 1
+	PAGE_KEYS_BYTES = 4
+
+	PAGE_HEADER = PAGE_ID_BYTES + PAGE_TYPE_BYTES + PAGE_KEYS_BYTES
 
 	// Page max keys
 	MAX_KEYS = 3 // 2 keys per page (for now)
