@@ -2,6 +2,7 @@ package kvdb
 
 import (
 	"encoding/binary"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -21,6 +22,13 @@ const (
 
 	// HEADER SIZE
 	HEADER = 0 + META_PAGE_SIZE
+
+	// First page after meta page
+	PAGES_OFFSET = HEADER
+	PAGE_HEADER  = 13 // 8 bytes for page id, 1 byte for type, 4 bytes for rows
+
+	// Page max keys
+	MAX_KEYS = 3 // 2 keys per page (for now)
 )
 
 type DB struct {
@@ -76,7 +84,7 @@ type Meta struct {
 
 type MetaBucket struct {
 	name     string
-	pageroot uint64
+	rootpage uint64
 }
 
 func (db *DB) newMeta() {
@@ -111,7 +119,7 @@ func (db *DB) writeMeta() error {
 		copy(bytes[offset:offset+100], []byte(bucket.name))
 		offset += 100
 		// append pageroot
-		binary.LittleEndian.PutUint64(bytes[offset:offset+8], uint64(bucket.pageroot))
+		binary.LittleEndian.PutUint64(bytes[offset:offset+8], uint64(bucket.rootpage))
 		offset += 8
 	}
 
@@ -152,7 +160,7 @@ func (db *DB) readMeta() (*Meta, error) {
 		b.name = string(bytes[offset : offset+100])
 		offset += 100
 		// read pageroot
-		b.pageroot = binary.LittleEndian.Uint64(bytes[offset : offset+8])
+		b.rootpage = binary.LittleEndian.Uint64(bytes[offset : offset+8])
 		offset += 8
 
 		// trim null bytes so the name has the correct length
@@ -170,4 +178,35 @@ func (m *Meta) getNewPageID() uint64 {
 	m.mu.Unlock()
 
 	return m.pgid
+}
+
+func (db *DB) pageOffset(pgid uint64) uint64 {
+	return uint64(PAGES_OFFSET + (int(pgid-1) * PAGE_SIZE))
+}
+
+func (db *DB) readPage(pgid uint64) (*Page, error) {
+	_, err := db.file.Seek(int64(db.pageOffset(pgid)), io.SeekStart)
+	if err != nil {
+		return nil, err
+	}
+
+	p := &Page{}
+	p.read()
+
+	return p, nil
+}
+
+func (db *DB) writePage(page Page) error {
+	// write page
+	_, err := db.file.Seek(int64(db.pageOffset(page.pgid)), io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.file.Write(page.write())
+	if err != nil {
+		return err
+	}
+
+	return nil
 }

@@ -9,9 +9,10 @@ Key value database. again for learning purposes.
 - [x] DB file open
 - [x] DB file close
 - [x] Create buckets
-- [ ] Create/Update keys
-- [ ] Delete keys
-- [ ] Read keys
+- [x] Create keys
+- [x] Read/Get keys
 - [ ] B+tree
 - [ ] Internal pages
 - [ ] Leaf pages
+- [ ] Update keys
+- [ ] Delete keys

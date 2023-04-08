@@ -45,8 +45,8 @@ func TestCreateBucket(t *testing.T) {
 		t.Fatal("bucket name not correct")
 	}
 
-	if db.meta.buckets[0].pageroot != 1 {
-		t.Fatalf("page id not correct: %d\n", db.meta.buckets[0].pageroot)
+	if db.meta.buckets[0].rootpage != 1 {
+		t.Fatalf("page id not correct: %d\n", db.meta.buckets[0].rootpage)
 	}
 }
 
@@ -84,8 +84,8 @@ func TestExsistingBucket(t *testing.T) {
 		t.Fatal("bucket name not correct")
 	}
 
-	if db.meta.buckets[0].pageroot != 1 {
-		t.Fatalf("page id not correct: %d\n", db.meta.buckets[0].pageroot)
+	if db.meta.buckets[0].rootpage != 1 {
+		t.Fatalf("page id not correct: %d\n", db.meta.buckets[0].rootpage)
 	}
 }
 
@@ -115,15 +115,90 @@ func TestCreateMultipleBuckets(t *testing.T) {
 		t.Fatal("bucket name not correct")
 	}
 
-	if db.meta.buckets[0].pageroot != 1 {
-		t.Fatalf("page id not correct: %d\n", db.meta.buckets[0].pageroot)
+	if db.meta.buckets[0].rootpage != 1 {
+		t.Fatalf("page id not correct: %d\n", db.meta.buckets[0].rootpage)
 	}
 
 	if db.meta.buckets[1].name != "posts" {
 		t.Fatal("bucket name not correct")
 	}
 
-	if db.meta.buckets[1].pageroot != 2 {
-		t.Fatalf("page id not correct: %d\n", db.meta.buckets[1].pageroot)
+	if db.meta.buckets[1].rootpage != 2 {
+		t.Fatalf("page id not correct: %d\n", db.meta.buckets[1].rootpage)
+	}
+}
+
+func TestPutKeys(t *testing.T) {
+	defer setupTest()
+	db, err := Open("test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	b, err := db.Bucket("users")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = b.Put([]byte("name"), []byte("John Doe"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	val, err := b.Get([]byte("name"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(val) != "John Doe" {
+		t.Fatalf("value not correct. expected: %s, got: %s | len %d\n", "John Doe", string(val), len(val))
+	}
+}
+
+func TestPutKeysMultipleBuckets(t *testing.T) {
+	defer setupTest()
+	db, err := Open("test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	b, err := db.Bucket("users")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = b.Put([]byte("name"), []byte("John Doe"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	val, err := b.Get([]byte("name"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(val) != "John Doe" {
+		t.Fatalf("value not correct. expected: %s, got: %s | len %d\n", "John Doe", string(val), len(val))
+	}
+
+	b, err = db.Bucket("posts")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = b.Put([]byte("title"), []byte("Hello World"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	val, err = b.Get([]byte("title"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(val) != "Hello World" {
+		t.Fatalf("value not correct. expected: %s, got: %s | len %d\n", "Hello World", string(val), len(val))
 	}
 }
