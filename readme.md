@@ -11,6 +11,7 @@ Key value database. again for learning purposes.
 - [x] Create buckets
 - [x] Create keys
 - [x] Read/Get keys
+- [x] Scan keys
 - [ ] B+tree
 - [ ] Internal pages
 - [ ] Leaf pages

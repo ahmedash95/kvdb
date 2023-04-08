@@ -2,7 +2,6 @@ package kvdb
 
 import (
 	"encoding/binary"
-	"io"
 	"os"
 	"strings"
 	"sync"
@@ -17,8 +16,8 @@ const (
 	NODE_TYPE_LEAF     = 0x02
 
 	// key/value length
-	KEY_SIZE   = 100  // 100 bytes
-	VALUE_SIZE = 3000 // 3000 bytes
+	KEY_SIZE   = 100 // 100 bytes
+	VALUE_SIZE = 100 // 3000 bytes
 
 	// HEADER SIZE
 	HEADER = 0 + META_PAGE_SIZE
@@ -170,43 +169,4 @@ func (db *DB) readMeta() (*Meta, error) {
 	}
 
 	return m, nil
-}
-
-func (m *Meta) getNewPageID() uint64 {
-	m.mu.Lock()
-	m.pgid++
-	m.mu.Unlock()
-
-	return m.pgid
-}
-
-func (db *DB) pageOffset(pgid uint64) uint64 {
-	return uint64(PAGES_OFFSET + (int(pgid-1) * PAGE_SIZE))
-}
-
-func (db *DB) readPage(pgid uint64) (*Page, error) {
-	_, err := db.file.Seek(int64(db.pageOffset(pgid)), io.SeekStart)
-	if err != nil {
-		return nil, err
-	}
-
-	p := &Page{}
-	p.read()
-
-	return p, nil
-}
-
-func (db *DB) writePage(page Page) error {
-	// write page
-	_, err := db.file.Seek(int64(db.pageOffset(page.pgid)), io.SeekStart)
-	if err != nil {
-		return err
-	}
-
-	_, err = db.file.Write(page.write())
-	if err != nil {
-		return err
-	}
-
-	return nil
 }

@@ -202,3 +202,54 @@ func TestPutKeysMultipleBuckets(t *testing.T) {
 		t.Fatalf("value not correct. expected: %s, got: %s | len %d\n", "Hello World", string(val), len(val))
 	}
 }
+
+func TestGetAllKeys(t *testing.T) {
+	defer setupTest()
+	db, err := Open("test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer db.Close()
+
+	b, err := db.Bucket("users")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = b.Put([]byte("name1"), []byte("Ali"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = b.Put([]byte("name3"), []byte("Ibrahim"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = b.Put([]byte("name2"), []byte("Ahmed"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	actualKeys := []string{}
+
+	err = b.Scan(func(key, val []byte) {
+		actualKeys = append(actualKeys, string(key))
+	})
+
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedKeys := []string{"name1", "name3", "name2"}
+
+	if len(actualKeys) != len(expectedKeys) {
+		t.Fatalf("expected %d keys, got %d\n", len(expectedKeys), len(actualKeys))
+	}
+
+	for i, key := range actualKeys {
+		if string(key) != expectedKeys[i] {
+			t.Fatalf("expected key %s, got %s\n", expectedKeys[i], string(key))
+		}
+	}
+}

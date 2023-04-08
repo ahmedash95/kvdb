@@ -1,7 +1,7 @@
 package kvdb
 
 import (
-	"encoding/binary"
+	"fmt"
 	"io"
 	"strings"
 )
@@ -49,40 +49,20 @@ func newBucket(db *DB, name string) (*Bucket, error) {
 	}, nil
 }
 
-func (b *Bucket) keys() (uint64, error) {
-	var bytes [8]byte
-	var keys uint64
-
-	_, err := b.db.file.Read(bytes[:])
-	if err != nil {
-		panic(err)
-	}
-
-	keys = binary.LittleEndian.Uint64(bytes[:])
-
-	return keys, nil
-}
-
 func (b *Bucket) Put(key, value []byte) error {
 	p, err := b.db.readPage(b.rootpage)
 	if err != nil {
 		return err
 	}
 
-	k, err := b.keys()
-	if err != nil {
-		return err
-	}
+	k := p.rows
 
 	if k > MAX_KEYS {
-		panic("Max keys per page reached")
+		return fmt.Errorf("max keys reached: %d. current key: %d", MAX_KEYS, k)
 	}
 
 	// update rows count
-	p.rows++
-	rowBytes := make([]byte, 8)
-	binary.LittleEndian.PutUint32(rowBytes, p.rows)
-	_, err = b.db.file.WriteAt(rowBytes[:], int64(b.db.pageOffset(b.rootpage))+9)
+	k, err = p.updateRows(b.db)
 	if err != nil {
 		return err
 	}
@@ -91,8 +71,10 @@ func (b *Bucket) Put(key, value []byte) error {
 	bytes := p.MakeRow(key, value)
 
 	// write new key to page
-	offset := b.db.pageOffset(b.rootpage) + uint64(PAGE_HEADER+(KEY_SIZE+VALUE_SIZE)*int(k-1))
-	_, err = b.db.file.WriteAt(bytes[:], int64(offset))
+	offset := b.db.pageOffset(b.rootpage) + p.keyPos(k)
+	b.db.file.Seek(int64(offset), io.SeekStart)
+
+	_, err = b.db.file.Write(bytes)
 	if err != nil {
 		return err
 	}
@@ -101,15 +83,12 @@ func (b *Bucket) Put(key, value []byte) error {
 }
 
 func (b *Bucket) Get(key []byte) ([]byte, error) {
-	_, err := b.db.readPage(b.rootpage)
+	p, err := b.db.readPage(b.rootpage)
 	if err != nil {
 		return nil, err
 	}
 
-	size, err := b.keys()
-	if err != nil {
-		return nil, err
-	}
+	size := p.rows
 
 	b.db.file.Seek(int64(b.db.pageOffset(b.rootpage)+PAGE_HEADER), io.SeekStart)
 
@@ -136,4 +115,38 @@ func (b *Bucket) Get(key []byte) ([]byte, error) {
 	}
 
 	return nil, nil
+}
+
+func (b *Bucket) Scan(call func([]byte, []byte)) error {
+	p, err := b.db.readPage(b.rootpage)
+	if err != nil {
+		return err
+	}
+
+	size := p.rows
+
+	b.db.file.Seek(int64(b.db.pageOffset(b.rootpage)+PAGE_HEADER), io.SeekStart)
+
+	for i := 0; i < int(size); i++ {
+		// read key
+		keybytes := make([]byte, KEY_SIZE)
+		_, err := b.db.file.Read(keybytes)
+		if err != nil {
+			return err
+		}
+
+		// read value
+		valbytes := make([]byte, VALUE_SIZE)
+		_, err = b.db.file.Read(valbytes)
+		if err != nil {
+			return err
+		}
+
+		keystr := strings.TrimRight(string(keybytes), "\x00")
+		valstr := strings.TrimRight(string(valbytes), "\x00")
+
+		call([]byte(keystr), []byte(valstr))
+	}
+
+	return nil
 }
