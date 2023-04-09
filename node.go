@@ -3,6 +3,7 @@ package kvdb
 import (
 	"bytes"
 	"encoding/binary"
+	"io"
 	"strings"
 )
 
@@ -14,12 +15,13 @@ type Node struct {
 	data []byte
 }
 
-func NewNode(pgid uint64) Node {
+func NewNode(pgid uint64, typ int) Node {
 	n := Node{
 		data: make([]byte, PAGE_SIZE),
 	}
 
 	n.setPgid(pgid)
+	n.setType(byte(typ))
 
 	return n
 }
@@ -145,4 +147,35 @@ func (n *Node) scan(call func([]byte, []byte)) {
 		value := []byte(strings.Trim(string(values[i]), "\x00"))
 		call(key, value)
 	}
+}
+
+func (db *DB) writeNode(n Node) error {
+	// write node
+	_, err := db.file.Seek(DB_HEADER+int64((n.pgid()-1)*PAGE_SIZE), io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.file.Write(n.data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *DB) readNode(pgid uint64) Node {
+	// read node
+	_, err := db.file.Seek(DB_HEADER+int64((pgid-1)*PAGE_SIZE), io.SeekStart)
+	if err != nil {
+		panic(err)
+	}
+
+	bytes := make([]byte, PAGE_SIZE)
+	_, err = db.file.Read(bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return NodeFromBytes(bytes)
 }

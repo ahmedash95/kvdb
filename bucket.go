@@ -31,7 +31,7 @@ func newBucket(db *DB, name string) (*Bucket, error) {
 		rootpage: db.meta.getNewPageID(),
 	}
 
-	err := db.writeNode(NewNode(b.rootpage))
+	err := db.writeNode(NewNode(b.rootpage, NODE_TYPE_LEAF))
 	if err != nil {
 		return nil, err
 	}

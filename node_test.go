@@ -6,7 +6,7 @@ import (
 )
 
 func TestNewNode(t *testing.T) {
-	n := NewNode(1)
+	n := NewNode(1, NODE_TYPE_LEAF)
 
 	if n.pgid() != 1 {
 		t.Fatal("page id not correct")
@@ -14,7 +14,7 @@ func TestNewNode(t *testing.T) {
 }
 
 func TestNodeInsert(t *testing.T) {
-	n := NewNode(1)
+	n := NewNode(1, NODE_TYPE_LEAF)
 
 	n.insert([]byte("key"), []byte("value"))
 
@@ -34,7 +34,7 @@ func TestNodeInsert(t *testing.T) {
 }
 
 func TestNodeInsertMultiple(t *testing.T) {
-	n := NewNode(1)
+	n := NewNode(1, NODE_TYPE_LEAF)
 
 	n.insert([]byte("name"), []byte("ahmed"))
 	n.insert([]byte("company"), []byte("shopify"))
@@ -62,7 +62,7 @@ func TestNodeInsertMultiple(t *testing.T) {
 }
 
 func TestNodeScan(t *testing.T) {
-	n := NewNode(1)
+	n := NewNode(1, NODE_TYPE_LEAF)
 
 	n.insert([]byte("name"), []byte("ahmed"))
 	n.insert([]byte("company"), []byte("shopify"))
