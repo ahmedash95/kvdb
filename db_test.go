@@ -241,7 +241,7 @@ func TestGetAllKeys(t *testing.T) {
 		t.Fatal(err)
 	}
 
-	expectedKeys := []string{"name1", "name3", "name2"}
+	expectedKeys := []string{"name1", "name2", "name3"}
 
 	if len(actualKeys) != len(expectedKeys) {
 		t.Fatalf("expected %d keys, got %d\n", len(expectedKeys), len(actualKeys))

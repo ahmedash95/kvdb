@@ -2,6 +2,7 @@ package kvdb
 
 import (
 	"encoding/binary"
+	"io"
 	"os"
 	"strings"
 	"sync"
@@ -19,11 +20,11 @@ const (
 	KEY_SIZE   = 100 // 100 bytes
 	VALUE_SIZE = 100 // 3000 bytes
 
-	// HEADER SIZE
-	HEADER = 0 + META_PAGE_SIZE
+	// DB_HEADER SIZE
+	DB_HEADER = 0 + META_PAGE_SIZE
 
 	// First page after meta page
-	PAGES_OFFSET = HEADER
+	PAGES_OFFSET = DB_HEADER
 
 	// Page header
 	PAGE_ID_BYTES   = 8
@@ -90,6 +91,14 @@ type Meta struct {
 type MetaBucket struct {
 	name     string
 	rootpage uint64
+}
+
+func (m *Meta) getNewPageID() uint64 {
+	m.mu.Lock()
+	m.pgid++
+	m.mu.Unlock()
+
+	return m.pgid
 }
 
 func (db *DB) newMeta() {
@@ -175,4 +184,35 @@ func (db *DB) readMeta() (*Meta, error) {
 	}
 
 	return m, nil
+}
+
+func (db *DB) writeNode(n Node) error {
+	// write node
+	_, err := db.file.Seek(DB_HEADER+int64((n.pgid()-1)*PAGE_SIZE), io.SeekStart)
+	if err != nil {
+		return err
+	}
+
+	_, err = db.file.Write(n.data)
+	if err != nil {
+		return err
+	}
+
+	return nil
+}
+
+func (db *DB) readNode(pgid uint64) Node {
+	// read node
+	_, err := db.file.Seek(DB_HEADER+int64((pgid-1)*PAGE_SIZE), io.SeekStart)
+	if err != nil {
+		panic(err)
+	}
+
+	bytes := make([]byte, PAGE_SIZE)
+	_, err = db.file.Read(bytes)
+	if err != nil {
+		panic(err)
+	}
+
+	return NodeFromBytes(bytes)
 }
