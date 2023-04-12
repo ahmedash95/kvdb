@@ -1,5 +1,7 @@
 package kvdb
 
+import "fmt"
+
 type Bucket struct {
 	db    *DB
 	root  uint64
@@ -28,16 +30,17 @@ func (b *Bucket) Put(key []byte, value []byte) error {
 	}
 
 	// insert key and value
+	fmt.Printf("inserting key %s into node %d\n", key, node.pgid)
 	node.insert(key, value)
 
-	//// if node is full, split it
-	//// @todo: this logic should be moved to commit transaction function
-	//// but for now, we will keep it here
-	//for i := len(cursor.stack) - 1; i >= 0; i-- {
-	//	// split every node that is full in the stack
-	//	cursor.stack[i].split()
-	//}
-	node.split()
+	// if node is full, split it
+	// @todo: this logic should be moved to commit transaction function
+	// but for now, we will keep it here
+	for i := len(cursor.stack) - 1; i >= 0; i-- {
+		// split every node that is full in the stack
+		cursor.stack[i].split()
+	}
+	//node.split()
 
 	return nil
 }
@@ -69,6 +72,14 @@ func (b *Bucket) newRootNode() *Node {
 
 	b.nodes[node.pgid] = node
 	b.root = node.pgid
+
+	return node
+}
+
+func (b *Bucket) newInternalNode() *Node {
+	node := newNode(b, b.db.meta.getNewPageID(), NODE_TYPE_INTERNAL)
+
+	b.nodes[node.pgid] = node
 
 	return node
 }

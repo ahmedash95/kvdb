@@ -4,6 +4,7 @@ import (
 	"fmt"
 	"os"
 	"os/exec"
+	"strings"
 )
 
 func Mermaid(b *Bucket) string {
@@ -30,11 +31,11 @@ func MermaidNode(n *Node, oldPrefix, prefix string) string {
 		nodeType = fmt.Sprintf("-%s-", nodeType)
 	}
 
-	keysStr := ""
+	keysStr := make([]string, 0)
 	for _, key := range n.Keys {
-		keysStr += fmt.Sprintf("%s ", string(key))
+		keysStr = append(keysStr, string(key))
 	}
-	output += fmt.Sprintf("%s(%s)\n", prefix, keysStr)
+	output += fmt.Sprintf("%s(%s)\n", prefix, strings.Join(keysStr, ", "))
 	if oldPrefix != "" {
 		output += fmt.Sprintf("%s -%s-> %s\n", oldPrefix, nodeType, prefix)
 	}
@@ -42,7 +43,7 @@ func MermaidNode(n *Node, oldPrefix, prefix string) string {
 	if n.typ == NODE_TYPE_INTERNAL {
 		for _, child := range n.children {
 			childNode := n.bucket.node(child)
-			if len(childNode.Keys) == 0 {
+			if len(childNode.Keys) == 0 { // debug only - should never happen
 				panic(fmt.Sprintf("childNode.Keys is empty: %v", child))
 			}
 			output += MermaidNode(childNode, prefix, fmt.Sprintf("%s_%s", prefix, string(childNode.Keys[0])))

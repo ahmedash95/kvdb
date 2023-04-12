@@ -29,27 +29,11 @@ func (n *Node) insert(key []byte, value []byte) {
 	// find index where key should be inserted
 	i := sort.Search(len(n.Keys), func(i int) bool { return bytes.Compare(n.Keys[i], key) != -1 })
 
-	// create new keys array with space for new key
-	keys := make([][]byte, len(n.Keys)+1)
-	// copy keys before index
-	copy(keys, n.Keys[:i])
 	// insert new key
-	keys[i] = key
-	// copy keys after index
-	copy(keys[i+1:], n.Keys[i:])
-	// set keys
-	n.Keys = keys
+	n.Keys = append(n.Keys[:i], append([][]byte{key}, n.Keys[i:]...)...)
 
-	// create new values array with space for new value
-	values := make([][]byte, len(n.values)+1)
-	// copy values before index
-	copy(values, n.values[:i])
 	// insert new value
-	values[i] = value
-	// copy values after index
-	copy(values[i+1:], n.values[i:])
-	// set values
-	n.values = values
+	n.values = append(n.values[:i], append([][]byte{value}, n.values[i:]...)...)
 }
 
 func (n *Node) split() {
@@ -63,49 +47,53 @@ func (n *Node) split() {
 		n.splitInternal()
 	}
 
-	n.bucket.node(n.parent).split()
+	//parent := n.bucket.node(n.parent)
+	//if len(parent.Keys) > MAX_KEYS_PER_NODE {
+	//	parent.split()
+	//}
 }
 
 func (n *Node) splitLeaf() {
 	if n.typ != NODE_TYPE_LEAF {
 		panic("cannot split non-leaf node")
 	}
-	// if parent is nil, create new parent
+
+	// as we are splitting, we must check the existence of parent node
+	// if parent node does not exist, create it
+	var parent *Node
 	if n.parent == 0 {
 		n.parent = n.bucket.newRootNode().pgid
-		n.bucket.node(n.parent).children = append(n.bucket.node(n.parent).children, n.pgid)
+		// as the parent node is new, we must update the root node
+		n.bucket.root = n.parent
+		// and we must attach the current node to the parent node
+		n.bucket.node(n.parent).addChild(n.pgid)
 	}
 
-	midIndex := MAX_KEYS_PER_NODE
-	midKey := n.Keys[midIndex]
+	parent = n.bucket.node(n.parent)
 
-	// create new sibling node
-	sibling := n.bucket.newNode(n.parent, n.typ)
-	sibling.parent = n.parent
+	// now we split the current into 2 halves. and second half will be the new node
+	// the first half will be the current node
 
-	n.bucket.node(n.parent).children = append(n.bucket.node(n.parent).children, sibling.pgid)
-	n.bucket.node(n.parent).Keys = append(n.bucket.node(n.parent).Keys, midKey)
+	sibling := n.bucket.newLeafNode()
 
-	// set sibling keys and values and children
+	// now we split the keys, values and children between the current node and the sibling node
+	n.Keys, sibling.Keys = n.splitTwoKeys()
+	n.values, sibling.values = n.splitTwoValues()
+	n.children, sibling.children = n.splitTwoChildren()
 
-	// create new keys array with space for new key
-	sibling.Keys = make([][]byte, len(n.Keys[midIndex:]))
-	// copy keys before index
-	copy(sibling.Keys, n.Keys[midIndex:])
+	// we must update the parent of the sibling node
+	sibling.parent = parent.pgid
+	// the parent node must have the sibling node as a child
+	parent.addChild(sibling.pgid)
 
-	// set new node keys and values
-	newKeys := make([][]byte, len(n.Keys[:midIndex]))
-	copy(newKeys, n.Keys[:midIndex])
-	n.Keys = newKeys
+	// as we have split the keys, sibling node children must be updated
+	//to have the sibling node as a parent
+	for _, child := range sibling.children {
+		n.bucket.node(child).parent = sibling.pgid
+	}
+	// and also parent node to have the sibling node's key as a key
+	parent.addKey(sibling.Keys[0])
 
-	// create new values array with space for new value
-	sibling.values = make([][]byte, len(n.values[midIndex:]))
-	// copy values before index
-	copy(sibling.values, n.values[midIndex:])
-
-	newValues := make([][]byte, len(n.values[:midIndex]))
-	copy(newValues, n.values[:midIndex])
-	n.values = newValues
 }
 
 func (n *Node) splitInternal() {
@@ -113,50 +101,104 @@ func (n *Node) splitInternal() {
 		panic("cannot split non-internal node")
 	}
 
-	// if parent is nil, create new parent
+	// as we are splitting, we must check the existence of parent node
+	// if parent node does not exist, create it
+	var parent *Node
 	if n.parent == 0 {
 		n.parent = n.bucket.newRootNode().pgid
-		n.bucket.node(n.parent).children = append(n.bucket.node(n.parent).children, n.pgid)
+		// as the parent node is new, we must update the root node
+		n.bucket.root = n.parent
+		// and we must attach the current node to the parent node
+		n.bucket.node(n.parent).addChild(n.pgid)
 	}
 
-	midIndex := MAX_KEYS_PER_NODE
-	midKey := n.Keys[midIndex]
+	parent = n.bucket.node(n.parent)
 
-	// create new sibling node
-	sibling := n.bucket.newNode(n.parent, n.typ)
+	// now we split the current into 2 halves. and second half will be the new node
+	// the first half will be the current node
+
+	sibling := n.bucket.newInternalNode()
+
+	// now we split the keys, values and children between the current node and the sibling node
+	n.Keys, sibling.Keys = n.splitTwoKeys()
+
+	// splitting internal node is a bit different
+	// we take one key out of the sibling node and put it in the parent node
+	if len(sibling.Keys) > 1 {
+		sibling.Keys = sibling.Keys[1:]
+	}
+
+	n.children, sibling.children = n.splitTwoChildren()
+	// internal node does not have values
+	sibling.values = make([][]byte, 0)
+	// we must update the parent of the sibling node
 	sibling.parent = n.parent
+	// the parent node must have the sibling node as a child
+	parent.addChild(sibling.pgid)
+	// and also parent node to have the sibling node's key as a key
+	parent.addKey(sibling.Keys[0])
 
-	// find the index to insert midKey in the parent
-	parent := n.bucket.node(n.parent)
-	i := sort.Search(len(parent.Keys), func(i int) bool { return bytes.Compare(parent.Keys[i], midKey) != -1 })
-
-	// insert midKey and sibling.pgid in the parent node
-	parent.Keys = append(parent.Keys, nil) // make space for the new key
-	copy(parent.Keys[i+1:], parent.Keys[i:])
-	parent.Keys[i] = midKey
-
-	parent.children = append(parent.children, 0) // make space for the new child
-	copy(parent.children[i+2:], parent.children[i+1:])
-	parent.children[i+1] = sibling.pgid
-
-	// set sibling keys and children
-	sibling.Keys = make([][]byte, len(n.Keys[midIndex+1:]))
-	copy(sibling.Keys, n.Keys[midIndex+1:])
-
-	sibling.children = make([]uint64, len(n.children[midIndex+1:]))
-	copy(sibling.children, n.children[midIndex+1:])
+	// as we have split the keys, sibling node children must be updated
+	//to have the sibling node as a parent
 	for _, child := range sibling.children {
 		n.bucket.node(child).parent = sibling.pgid
 	}
 
-	// set new node keys and children
-	newKeys := make([][]byte, len(n.Keys[:midIndex]))
-	copy(newKeys, n.Keys[:midIndex])
-	n.Keys = newKeys
+}
 
-	newChildren := make([]uint64, len(n.children[:midIndex+1]))
-	copy(newChildren, n.children[:midIndex+1])
-	n.children = newChildren
+func (n *Node) addChild(pgid uint64) {
+	// find index where child should be inserted based on the key
+	newNode := n.bucket.node(pgid)
+
+	i := sort.Search(len(n.children), func(i int) bool {
+		currentNode := n.bucket.node(n.children[i])
+
+		return bytes.Compare(currentNode.Keys[0], newNode.Keys[0]) != -1
+	})
+
+	n.children = append(n.children[:i], append([]uint64{pgid}, n.children[i:]...)...)
+}
+
+func (n *Node) addKey(key []byte) {
+	// find index where key should be inserted
+	i := sort.Search(len(n.Keys), func(i int) bool { return bytes.Compare(n.Keys[i], key) != -1 })
+
+	// insert new key
+	n.Keys = append(n.Keys[:i], append([][]byte{key}, n.Keys[i:]...)...)
+}
+
+// splitTwoKeys splits the keys into two halves and return 2 new copies of keys
+func (n *Node) splitTwoKeys() ([][]byte, [][]byte) {
+	mid := len(n.Keys) / 2
+	left := make([][]byte, mid)
+	right := make([][]byte, len(n.Keys)-mid)
+
+	copy(left, n.Keys[:mid])
+	copy(right, n.Keys[mid:])
+
+	return left, right
+}
+
+func (n *Node) splitTwoValues() ([][]byte, [][]byte) {
+	mid := len(n.values) / 2
+	left := make([][]byte, mid)
+	right := make([][]byte, len(n.values)-mid)
+
+	copy(left, n.values[:mid])
+	copy(right, n.values[mid:])
+
+	return left, right
+}
+
+func (n *Node) splitTwoChildren() ([]uint64, []uint64) {
+	mid := len(n.children) / 2
+	left := make([]uint64, mid)
+	right := make([]uint64, len(n.children)-mid)
+
+	copy(left, n.children[:mid])
+	copy(right, n.children[mid:])
+
+	return left, right
 }
 
 func newNode(b *Bucket, pgid uint64, typ uint8) *Node {

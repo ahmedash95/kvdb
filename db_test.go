@@ -2,6 +2,7 @@ package kvdb
 
 import (
 	"fmt"
+	"math/rand"
 	"testing"
 )
 
@@ -33,7 +34,13 @@ func TestDBInsertMultiple(t *testing.T) {
 
 	bucket := db.Bucket("user_emails")
 
-	names := []string{"Ahmed", "Basem", "Camal", "Dawood", "Emad", "Fady", "Gamal", "Hassan", "Ibrahim", "Jack", "Khaled"}
+	names := []string{"Ahmed", "Basem", "Hassan", "Ibrahim", "Camal", "Emad", "Fady", "Dawood", "Jack", "Khaled"}
+
+	// shuffle names
+	for i := range names {
+		j := rand.Intn(i + 1)
+		names[i], names[j] = names[j], names[i]
+	}
 
 	for _, name := range names {
 		err = bucket.Put([]byte(name), []byte(fmt.Sprintf("%s@email.com", name)))
