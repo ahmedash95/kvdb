@@ -7,12 +7,12 @@ import (
 )
 
 type Meta struct {
-	buckets []*MetaBucket
+	buckets []*MetaRecord
 	pgid    uint64
 	mu      sync.Mutex
 }
 
-type MetaBucket struct {
+type MetaRecord struct {
 	name     string
 	rootpage uint64
 }
@@ -22,16 +22,33 @@ func (m *Meta) getNewPageID() uint64 {
 	m.pgid++
 	m.mu.Unlock()
 
+	// @todo: persist meta page to disk to reflect last page id
+
 	return m.pgid
 }
 
-func (db *DB) newMeta() {
+// newBucket should be called only from DB.Bucket()
+func (m *Meta) newBucket(db *DB, s string) *Bucket {
+	// create new bucket
+	record := &MetaRecord{
+		name:     s,
+		rootpage: m.getNewPageID(),
+	}
+
+	m.mu.Lock()
+	m.buckets = append(m.buckets, record)
+	m.mu.Unlock()
+
+	return newBucket(db, record.rootpage)
+}
+
+func (db *DB) newMeta() error {
 	db.meta = &Meta{
-		buckets: make([]*MetaBucket, 0),
+		buckets: make([]*MetaRecord, 0),
 		pgid:    0,
 	}
 
-	db.writeMeta()
+	return db.writeMeta()
 }
 
 // meta page is always the first page
@@ -93,7 +110,7 @@ func (db *DB) readMeta() (*Meta, error) {
 	// read meta buckets
 	var i uint64
 	for i = 0; i < size; i++ {
-		b := &MetaBucket{}
+		b := &MetaRecord{}
 		// read name
 		b.name = string(bytes[offset : offset+100])
 		offset += 100

@@ -2,180 +2,170 @@ package kvdb
 
 import (
 	"bytes"
-	"encoding/binary"
-	"io"
-	"strings"
+	"sort"
 )
 
-// Node represents a page in the B+ tree
-// the page is stored entirely in the data field
-// the user of the node is responsible for persisting
-// the data to disk at any time
 type Node struct {
-	data []byte
+	bucket   *Bucket
+	pgid     uint64
+	parent   uint64   // pgid of parent node
+	typ      uint8    // 0: internal, 1: leaf
+	Keys     [][]byte // keys of internal nodes
+	children []uint64 // pgid of children nodes
+	values   [][]byte // values of leaf nodes
 }
 
-func NewNode(pgid uint64, typ int) Node {
-	n := Node{
-		data: make([]byte, PAGE_SIZE),
-	}
-
-	n.setPgid(pgid)
-	n.setType(byte(typ))
-
-	return n
-}
-
-func NodeFromBytes(data []byte) Node {
-	return Node{
-		data: data,
-	}
-}
-
-func (n *Node) setPgid(pgid uint64) {
-	binary.LittleEndian.PutUint64(n.data[0:8], pgid)
-}
-
-func (n *Node) pgid() uint64 {
-	return binary.LittleEndian.Uint64(n.data[0:8])
-}
-
-// setType sets the type of the node either leaf or internal
-func (n *Node) setType(_type byte) {
-	n.data[8] = _type
-}
-
-func (n *Node) _type() byte {
-	return n.data[8]
-}
-
-func (n *Node) setKeys(keys [][]byte) {
-	nKeys := len(keys)
-	binary.LittleEndian.PutUint32(n.data[9:13], uint32(nKeys))
-
-	offset := 13
-	for _, key := range keys {
-		copy(n.data[offset:offset+KEY_SIZE], key)
-		offset += KEY_SIZE
-	}
-}
-
-func (n *Node) nkeys() uint32 {
-	return binary.LittleEndian.Uint32(n.data[9:13])
-}
-
-func (n *Node) keys() [][]byte {
-	nKeys := n.nkeys()
-
-	keys := make([][]byte, nKeys)
-	offset := 13
-	for i := 0; i < int(nKeys); i++ {
-		keys[i] = make([]byte, KEY_SIZE)
-		copy(keys[i], n.data[offset:offset+KEY_SIZE])
-		offset += KEY_SIZE
-	}
-
-	return keys
-}
-
-func (n *Node) setValues(values [][]byte) {
-	offset := 13 + (len(n.keys()) * KEY_SIZE)
-	for _, value := range values {
-		copy(n.data[offset:offset+VALUE_SIZE], value)
-		offset += VALUE_SIZE
-	}
-}
-
-func (n *Node) values() [][]byte {
-	nKeys := binary.LittleEndian.Uint32(n.data[9:13])
-
-	values := make([][]byte, nKeys)
-	offset := 13 + (int(nKeys) * KEY_SIZE)
-	for i := 0; i < int(nKeys); i++ {
-		values[i] = make([]byte, VALUE_SIZE)
-		copy(values[i], n.data[offset:offset+VALUE_SIZE])
-		offset += VALUE_SIZE
-	}
-
-	return values
-}
-
-func (n *Node) insert(key, value []byte) {
-	keys := n.keys()
-	values := n.values()
-
-	// find the index to insert the key
-	i := 0
-	for i < len(keys) && bytes.Compare(keys[i], key) < 0 {
-		i++
-	}
-
-	// insert the key and value
-	keys = append(keys, nil)
-	copy(keys[i+1:], keys[i:])
-	keys[i] = key
-
-	values = append(values, nil)
-	copy(values[i+1:], values[i:])
-	values[i] = value
-
-	n.setKeys(keys)
-	n.setValues(values)
-}
-
-func (n *Node) get(key []byte) ([]byte, bool) {
-	keyByte := make([]byte, KEY_SIZE)
-	copy(keyByte, key)
-
-	keys := n.keys()
-	for i, k := range keys {
-		if bytes.Equal(k, keyByte) {
-			val := n.values()[i]
-			return []byte(strings.Trim(string(val), "\x00")), true
+func (n Node) findKey(key []byte) (int, bool) {
+	for i, k := range n.Keys {
+		if bytes.Compare(k, key) == 0 {
+			return i, true
 		}
 	}
 
-	return nil, false
+	return -1, false
 }
 
-func (n *Node) scan(call func([]byte, []byte)) {
-	keys := n.keys()
-	values := n.values()
+func (n *Node) insert(key []byte, value []byte) {
+	// find index where key should be inserted
+	i := sort.Search(len(n.Keys), func(i int) bool { return bytes.Compare(n.Keys[i], key) != -1 })
 
-	for i, key := range keys {
-		key = []byte(strings.Trim(string(key), "\x00"))
-		value := []byte(strings.Trim(string(values[i]), "\x00"))
-		call(key, value)
-	}
+	// create new keys array with space for new key
+	keys := make([][]byte, len(n.Keys)+1)
+	// copy keys before index
+	copy(keys, n.Keys[:i])
+	// insert new key
+	keys[i] = key
+	// copy keys after index
+	copy(keys[i+1:], n.Keys[i:])
+	// set keys
+	n.Keys = keys
+
+	// create new values array with space for new value
+	values := make([][]byte, len(n.values)+1)
+	// copy values before index
+	copy(values, n.values[:i])
+	// insert new value
+	values[i] = value
+	// copy values after index
+	copy(values[i+1:], n.values[i:])
+	// set values
+	n.values = values
 }
 
-func (db *DB) writeNode(n Node) error {
-	// write node
-	_, err := db.file.Seek(DB_HEADER+int64((n.pgid()-1)*PAGE_SIZE), io.SeekStart)
-	if err != nil {
-		return err
+func (n *Node) split() {
+	if len(n.Keys) <= MAX_KEYS_PER_NODE {
+		return
 	}
 
-	_, err = db.file.Write(n.data)
-	if err != nil {
-		return err
+	if n.typ == NODE_TYPE_LEAF {
+		n.splitLeaf()
+	} else {
+		n.splitInternal()
 	}
 
-	return nil
+	n.bucket.node(n.parent).split()
 }
 
-func (db *DB) readNode(pgid uint64) Node {
-	// read node
-	_, err := db.file.Seek(DB_HEADER+int64((pgid-1)*PAGE_SIZE), io.SeekStart)
-	if err != nil {
-		panic(err)
+func (n *Node) splitLeaf() {
+	if n.typ != NODE_TYPE_LEAF {
+		panic("cannot split non-leaf node")
+	}
+	// if parent is nil, create new parent
+	if n.parent == 0 {
+		n.parent = n.bucket.newRootNode().pgid
+		n.bucket.node(n.parent).children = append(n.bucket.node(n.parent).children, n.pgid)
 	}
 
-	bytes := make([]byte, PAGE_SIZE)
-	_, err = db.file.Read(bytes)
-	if err != nil {
-		panic(err)
+	midIndex := MAX_KEYS_PER_NODE
+	midKey := n.Keys[midIndex]
+
+	// create new sibling node
+	sibling := n.bucket.newNode(n.parent, n.typ)
+	sibling.parent = n.parent
+
+	n.bucket.node(n.parent).children = append(n.bucket.node(n.parent).children, sibling.pgid)
+	n.bucket.node(n.parent).Keys = append(n.bucket.node(n.parent).Keys, midKey)
+
+	// set sibling keys and values and children
+
+	// create new keys array with space for new key
+	sibling.Keys = make([][]byte, len(n.Keys[midIndex:]))
+	// copy keys before index
+	copy(sibling.Keys, n.Keys[midIndex:])
+
+	// set new node keys and values
+	newKeys := make([][]byte, len(n.Keys[:midIndex]))
+	copy(newKeys, n.Keys[:midIndex])
+	n.Keys = newKeys
+
+	// create new values array with space for new value
+	sibling.values = make([][]byte, len(n.values[midIndex:]))
+	// copy values before index
+	copy(sibling.values, n.values[midIndex:])
+
+	newValues := make([][]byte, len(n.values[:midIndex]))
+	copy(newValues, n.values[:midIndex])
+	n.values = newValues
+}
+
+func (n *Node) splitInternal() {
+	if n.typ != NODE_TYPE_INTERNAL {
+		panic("cannot split non-internal node")
 	}
 
-	return NodeFromBytes(bytes)
+	// if parent is nil, create new parent
+	if n.parent == 0 {
+		n.parent = n.bucket.newRootNode().pgid
+		n.bucket.node(n.parent).children = append(n.bucket.node(n.parent).children, n.pgid)
+	}
+
+	midIndex := MAX_KEYS_PER_NODE
+	midKey := n.Keys[midIndex]
+
+	// create new sibling node
+	sibling := n.bucket.newNode(n.parent, n.typ)
+	sibling.parent = n.parent
+
+	// find the index to insert midKey in the parent
+	parent := n.bucket.node(n.parent)
+	i := sort.Search(len(parent.Keys), func(i int) bool { return bytes.Compare(parent.Keys[i], midKey) != -1 })
+
+	// insert midKey and sibling.pgid in the parent node
+	parent.Keys = append(parent.Keys, nil) // make space for the new key
+	copy(parent.Keys[i+1:], parent.Keys[i:])
+	parent.Keys[i] = midKey
+
+	parent.children = append(parent.children, 0) // make space for the new child
+	copy(parent.children[i+2:], parent.children[i+1:])
+	parent.children[i+1] = sibling.pgid
+
+	// set sibling keys and children
+	sibling.Keys = make([][]byte, len(n.Keys[midIndex+1:]))
+	copy(sibling.Keys, n.Keys[midIndex+1:])
+
+	sibling.children = make([]uint64, len(n.children[midIndex+1:]))
+	copy(sibling.children, n.children[midIndex+1:])
+	for _, child := range sibling.children {
+		n.bucket.node(child).parent = sibling.pgid
+	}
+
+	// set new node keys and children
+	newKeys := make([][]byte, len(n.Keys[:midIndex]))
+	copy(newKeys, n.Keys[:midIndex])
+	n.Keys = newKeys
+
+	newChildren := make([]uint64, len(n.children[:midIndex+1]))
+	copy(newChildren, n.children[:midIndex+1])
+	n.children = newChildren
+}
+
+func newNode(b *Bucket, pgid uint64, typ uint8) *Node {
+	return &Node{
+		bucket:   b,
+		pgid:     pgid,
+		typ:      typ,
+		Keys:     make([][]byte, 0),
+		children: make([]uint64, 0),
+		values:   make([][]byte, 0),
+	}
 }

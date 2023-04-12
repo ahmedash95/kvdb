@@ -11,6 +11,7 @@ const (
 	// node types
 	NODE_TYPE_INTERNAL = 0x01
 	NODE_TYPE_LEAF     = 0x02
+	MAX_KEYS_PER_NODE  = 2
 
 	// key/value length
 	KEY_SIZE   = 100 // 100 bytes
@@ -18,19 +19,6 @@ const (
 
 	// DB_HEADER SIZE
 	DB_HEADER = 0 + META_PAGE_SIZE
-
-	// First page after meta page
-	PAGES_OFFSET = DB_HEADER
-
-	// Page header
-	PAGE_ID_BYTES   = 8
-	PAGE_TYPE_BYTES = 1
-	PAGE_KEYS_BYTES = 4
-
-	PAGE_HEADER = PAGE_ID_BYTES + PAGE_TYPE_BYTES + PAGE_KEYS_BYTES
-
-	// Page max keys
-	MAX_KEYS = 3 // 2 keys per page (for now)
 )
 
 type DB struct {
@@ -67,7 +55,10 @@ func newDB(path string) (*DB, error) {
 	}
 
 	if fi.Size() == 0 {
-		db.newMeta()
+		err := db.newMeta()
+		if err != nil {
+			return nil, err
+		}
 	} else {
 		db.meta, err = db.readMeta()
 		if err != nil {
@@ -76,4 +67,16 @@ func newDB(path string) (*DB, error) {
 	}
 
 	return db, nil
+}
+
+func (db *DB) Bucket(s string) *Bucket {
+	// find bucket in meta page
+	for _, record := range db.meta.buckets {
+		if record.name == s {
+			return newBucket(db, record.rootpage)
+		}
+	}
+
+	// if bucket not found, create new bucket
+	return db.meta.newBucket(db, s)
 }
