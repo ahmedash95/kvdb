@@ -15,7 +15,7 @@ Key value database. again for learning purposes.
 - [x] B+tree
 - [x] Internal pages
 - [x] Leaf pages
-- [ ] Update keys
+- [x] Update keys
 - [ ] Delete keys
 - [ ] Free list pages
 
@@ -43,6 +43,13 @@ for country, email := range countryEmails {
     if err != nil {
         t.Fatal(err)
     }
+}
+
+
+// Update record
+err = bucket.Put([]byte("Egypt"), []byte("cairo@gmail.com")
+if err != nil {
+    t.Fatal(err)
 }
 
 // Fetch record

@@ -154,3 +154,33 @@ func TestDBGet(t *testing.T) {
 		t.Fatal("expected error but got nil")
 	}
 }
+
+func TestDBUpdate(t *testing.T) {
+	db, err := Open("test.db", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer db.Close()
+
+	bucket := db.Bucket("user_emails")
+
+	err = bucket.Put([]byte("ahmed"), []byte("ahmed@gmail.com"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = bucket.Put([]byte("ahmed"), []byte("new@gmail.com"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	value, err := bucket.Get([]byte("ahmed"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	if string(value) != "new@gmail.com" {
+		t.Fatalf("expected email %s but got %s", "new@gmail.com", string(value))
+	}
+}

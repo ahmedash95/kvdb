@@ -47,6 +47,35 @@ func (b *Bucket) Put(key []byte, value []byte) error {
 	return nil
 }
 
+func (b *Bucket) Update(key []byte, value []byte) error {
+	cursor := b.Cursor()
+
+	// get node where key should be
+	node := cursor.seek(key)
+
+	// if key  exists, update value
+	if i, ok := node.findKey(key); ok {
+		node.values[i] = value
+		return nil
+	}
+
+	return fmt.Errorf("key not found")
+}
+
+func (b *Bucket) Get(key []byte) ([]byte, error) {
+	cursor := b.Cursor()
+
+	// get node where key should be
+	node := cursor.seek(key)
+
+	// if key exists, return value
+	if i, ok := node.findKey(key); ok {
+		return node.values[i], nil
+	}
+
+	return nil, fmt.Errorf("key not found")
+}
+
 func (b *Bucket) Cursor() Cursor {
 	return newCursor(b)
 }
@@ -106,19 +135,4 @@ func (b *Bucket) newNode(parent uint64, typ uint8) *Node {
 
 func (b *Bucket) Scan(f func(key []byte, value []byte) bool) {
 	b.node(b.root).scan(f)
-}
-
-func (b *Bucket) Get(key []byte) ([]byte, error) {
-	cursor := b.Cursor()
-
-	// get node where key should be inserted
-	node := cursor.seek(key)
-
-	// if key already exists, update value
-	// if key does not exist, the value is -1
-	if i, ok := node.findKey(key); ok {
-		return node.values[i], nil
-	}
-
-	return nil, fmt.Errorf("key not found")
 }
