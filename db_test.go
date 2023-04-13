@@ -184,3 +184,65 @@ func TestDBUpdate(t *testing.T) {
 		t.Fatalf("expected email %s but got %s", "new@gmail.com", string(value))
 	}
 }
+
+func TestDBDelete(t *testing.T) {
+	db, err := Open("test.db", &Config{maxKeysPerNode: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer db.Close()
+
+	bucket := db.Bucket("user_emails")
+
+	defer injectAndPrintMermaid(db, bucket)()
+
+	countryEmails := map[string]string{
+		"Zanzibar": "zanzibar@gmail.com",
+		"Algeria":  "algeria@gmail.com",
+		"Egypt":    "egypt@gmail.com",
+	}
+
+	for country, email := range countryEmails {
+		err = bucket.Put([]byte(country), []byte(email))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = bucket.Delete([]byte("Algeria"))
+	if err != nil {
+		t.Fatal(err)
+	}
+}
+
+func TestFreeList(t *testing.T) {
+	db, err := Open("test.db", &Config{maxKeysPerNode: 2})
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer db.Close()
+
+	bucket := db.Bucket("user_emails")
+
+	defer injectAndPrintMermaid(db, bucket)()
+
+	countryEmails := map[string]string{
+		"Zanzibar": "zanzibar@gmail.com",
+		"Algeria":  "algeria@gmail.com",
+		"Egypt":    "egypt@gmail.com",
+	}
+
+	for country, email := range countryEmails {
+		err = bucket.Put([]byte(country), []byte(email))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	err = bucket.Delete([]byte("Algeria"))
+	if err != nil {
+		t.Fatal(err)
+	}
+}

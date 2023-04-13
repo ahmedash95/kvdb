@@ -76,6 +76,22 @@ func (b *Bucket) Get(key []byte) ([]byte, error) {
 	return nil, fmt.Errorf("key not found")
 }
 
+func (b *Bucket) Delete(key []byte) error {
+	cursor := b.Cursor()
+
+	// get node where key should be
+	node := cursor.seek(key)
+
+	// if key exists, delete it
+	if i, ok := node.findKey(key); ok {
+		node.delete(i)
+		b.node(node.parent).possibleFree(node.pgid)
+		return nil
+	}
+
+	return fmt.Errorf("key not found")
+}
+
 func (b *Bucket) Cursor() Cursor {
 	return newCursor(b)
 }

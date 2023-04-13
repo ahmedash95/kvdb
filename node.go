@@ -225,6 +225,49 @@ func (n *Node) scan(f func(key []byte, value []byte) bool) {
 	}
 }
 
+func (n *Node) delete(i int) {
+	newKeys := make([][]byte, len(n.Keys)-1)
+	copy(newKeys, n.Keys[:i])
+	copy(newKeys[i:], n.Keys[i+1:])
+	n.Keys = newKeys
+
+	newValues := make([][]byte, len(n.values)-1)
+	copy(newValues, n.values[:i])
+	copy(newValues[i:], n.values[i+1:])
+	n.values = newValues
+}
+
+func (n *Node) possibleFree(pgid uint64) {
+	if n.typ != NODE_TYPE_INTERNAL {
+		panic("cannot free node from non-internal node")
+	}
+
+	node := n.bucket.node(pgid)
+
+	// if the node is not empty, we cannot free it
+	if len(node.Keys) > 0 {
+		return
+	}
+
+	// if the node is empty, we must remove it from the parent node
+	n.removeChild(pgid)
+
+	// @todo: add the node to the freelist
+}
+
+func (n *Node) removeChild(pgid uint64) {
+	var newChildren []uint64
+	for _, child := range n.children {
+		if child == pgid {
+			continue
+		}
+
+		newChildren = append(newChildren, child)
+	}
+
+	n.children = newChildren
+}
+
 func newNode(b *Bucket, pgid uint64, typ uint8) *Node {
 	return &Node{
 		bucket:   b,

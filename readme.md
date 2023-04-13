@@ -5,6 +5,7 @@ Key value database. again for learning purposes.
 
 ## Roadmap
 
+### Basic features
 - [x] DB file create
 - [x] DB file open
 - [x] DB file close
@@ -12,12 +13,20 @@ Key value database. again for learning purposes.
 - [x] Create keys
 - [x] Read/Get keys
 - [x] Scan keys
+
+### Memory B+tree
 - [x] B+tree
 - [x] Internal pages
 - [x] Leaf pages
 - [x] Update keys
-- [ ] Delete keys
+- [x] Delete keys
 - [ ] Free list pages
+
+### Persistence
+- [ ] Write pages to disk
+- [ ] Read pages from disk
+- [ ] Write Free list pages in meta to disk
+- [ ] Read Free list pages from disk
 
 
 ## Usage
