@@ -2,6 +2,7 @@ package kvdb
 
 import (
 	"fmt"
+	"io/ioutil"
 	"os"
 	"os/exec"
 	"strings"
@@ -74,6 +75,41 @@ func printBucket(b *Bucket) {
 	// open tree.png
 	cmd = exec.Command("open", "tree.svg")
 	err = cmd.Run()
+	if err != nil {
+		panic(err)
+	}
+}
+
+func MermaidHtml(b *Bucket) string {
+	result := Mermaid(b)
+
+	// wrap the string in "<div class="mermaid">" and "</div>"
+	return fmt.Sprintf("<div class=\"mermaid active\">\n%s\n</div>", result)
+}
+
+func mermaidToHtml(arr []string) {
+	content, err := ioutil.ReadFile("mermaid.html")
+	if err != nil {
+		panic(err)
+	}
+
+	htmlString := string(content)
+	startTag := `<section id="list">`
+	endTag := `</section>`
+
+	startIdx := strings.Index(htmlString, startTag)
+	endIdx := strings.Index(htmlString, endTag)
+
+	if startIdx == -1 || endIdx == -1 {
+		panic(fmt.Sprintf("section with ID 'list' not found"))
+	}
+
+	startIdx += len(startTag)
+	newContent := strings.Join(arr, "\n")
+
+	newHTMLString := htmlString[:startIdx] + newContent + htmlString[endIdx:]
+
+	err = os.WriteFile("mermaid.html", []byte(newHTMLString), os.ModePerm)
 	if err != nil {
 		panic(err)
 	}

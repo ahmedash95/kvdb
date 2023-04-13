@@ -11,7 +11,7 @@ const (
 	// node types
 	NODE_TYPE_INTERNAL = 0x01
 	NODE_TYPE_LEAF     = 0x02
-	MAX_KEYS_PER_NODE  = 2
+	MAX_KEYS_PER_NODE  = 1
 
 	// key/value length
 	KEY_SIZE   = 100 // 100 bytes
@@ -22,8 +22,9 @@ const (
 )
 
 type DB struct {
-	file *os.File
-	path string
+	file        *os.File
+	path        string
+	CallOnSplit func()
 
 	meta *Meta
 }

@@ -2,9 +2,26 @@ package kvdb
 
 import (
 	"fmt"
-	"math/rand"
 	"testing"
 )
+
+func injectAndPrintMermaid(db *DB, bucket *Bucket) func() {
+	var mermaidDevs []string
+	db.CallOnSplit = func() {
+		newMermaid := MermaidHtml(bucket)
+		// check if the new mermaid is not the same as the previous one
+		if len(mermaidDevs) > 0 && mermaidDevs[len(mermaidDevs)-1] == newMermaid {
+			return
+		}
+
+		mermaidDevs = append(mermaidDevs, newMermaid)
+	}
+
+	return func() {
+		mermaidDevs = append(mermaidDevs, MermaidHtml(bucket))
+		mermaidToHtml(mermaidDevs)
+	}
+}
 
 func TestDB(t *testing.T) {
 	db, err := Open("test.db")
@@ -34,13 +51,8 @@ func TestDBInsertMultiple(t *testing.T) {
 
 	bucket := db.Bucket("user_emails")
 
-	names := []string{"Ahmed", "Basem", "Hassan", "Ibrahim", "Camal", "Emad", "Fady", "Dawood", "Jack", "Khaled"}
-
-	// shuffle names
-	for i := range names {
-		j := rand.Intn(i + 1)
-		names[i], names[j] = names[j], names[i]
-	}
+	// names are sorted in a way to catch sorting issues if splitting is picking different keys
+	names := []string{"Ibrahim", "Gamal", "Hassan", "Camal", "Basem", "Dawood", "Emad", "Ahmed", "Fady"}
 
 	for _, name := range names {
 		err = bucket.Put([]byte(name), []byte(fmt.Sprintf("%s@email.com", name)))
@@ -48,6 +60,67 @@ func TestDBInsertMultiple(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+}
 
-	printBucket(bucket)
+func TestDBScanRecords(t *testing.T) {
+	db, err := Open("test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer db.Close()
+
+	bucket := db.Bucket("user_emails")
+
+	err = bucket.Put([]byte("Zanzibar"), []byte("zanzibar@gmail.com"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = bucket.Put([]byte("Algeria"), []byte("algeria@gmail.com"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = bucket.Put([]byte("Egypt"), []byte("egypt@gmail.com"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	expectedKeys := []string{"Algeria", "Egypt", "Zanzibar"}
+	actualKeys := []string{}
+	bucket.Scan(func(key, value []byte) bool {
+		actualKeys = append(actualKeys, string(key))
+		return true
+	})
+
+	if len(expectedKeys) != len(actualKeys) {
+		t.Fatalf("expected %d keys but got %d", len(expectedKeys), len(actualKeys))
+	}
+
+	for i, expectedKey := range expectedKeys {
+		if expectedKey != actualKeys[i] {
+			t.Fatalf("expected key %s but got %s", expectedKey, actualKeys[i])
+		}
+	}
+}
+
+func TestDBInsertMultiple2(t *testing.T) {
+	db, err := Open("test.db")
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer db.Close()
+
+	bucket := db.Bucket("user_emails")
+
+	// names are sorted in a way to catch sorting issues if splitting is picking different keys
+	names := []string{"Ahmed", "Dawood", "Emad"}
+	defer injectAndPrintMermaid(db, bucket)()
+
+	for _, name := range names {
+		err = bucket.Put([]byte(name), []byte(fmt.Sprintf("%s@email.com", name)))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
 }

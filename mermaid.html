@@ -1,0 +1,105 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Mermaid & Tailwind Demo</title>
+    <script src="https://cdn.tailwindcss.com"></script>
+    <style>
+        .mermaid {
+            display: none;
+        }
+
+        .mermaid.active {
+            display: block;
+        }
+    </style>
+    <script type="module">
+        import mermaid from 'https://cdn.jsdelivr.net/npm/mermaid@10/dist/mermaid.esm.min.mjs';
+
+        mermaid.initialize({startOnLoad: true});
+
+        // remove active class from all mermaid divs but the first one
+        const mermaidDivs = document.querySelectorAll('.mermaid');
+
+        setTimeout(() => {
+            mermaidDivs.forEach((div, index) => {
+                if (index !== mermaidDivs.length - 1) {
+                    div.classList.remove('active');
+                }
+            });
+        }, 1000);
+
+        let currentIndex = 0;
+
+        function showSlide(index) {
+            mermaidDivs.forEach(div => div.classList.remove('active'));
+            mermaidDivs[index].classList.add('active');
+        }
+
+        window.prevSlide = function () {
+            currentIndex = (currentIndex === 0) ? mermaidDivs.length - 1 : currentIndex - 1;
+            showSlide(currentIndex);
+        }
+
+        window.nextSlide = function() {
+            currentIndex = (currentIndex === mermaidDivs.length - 1) ? 0 : currentIndex + 1;
+            showSlide(currentIndex);
+        }
+    </script>
+</head>
+<body class="p-4">
+<div class="bg-gray-200 p-4 rounded-lg">
+    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onclick="prevSlide()">
+        Previous
+    </button>
+    <button class="bg-blue-500 hover:bg-blue-700 text-white font-bold py-2 px-4 rounded" onclick="nextSlide()">Next
+    </button>
+    <section id="list"><div class="mermaid active">
+graph TD;
+Tree(Ahmed)
+
+</div>
+<div class="mermaid active">
+graph TD;
+Tree(Ahmed, Dawood)
+
+</div>
+<div class="mermaid active">
+graph TD;
+Tree(Dawood)
+Tree_Ahmed(Ahmed)
+Tree --> Tree_Ahmed
+Tree_Dawood(Dawood, Emad)
+Tree --> Tree_Dawood
+
+</div>
+<div class="mermaid active">
+graph TD;
+Tree(Dawood, Emad)
+Tree_Ahmed(Ahmed)
+Tree --> Tree_Ahmed
+Tree_Dawood(Dawood)
+Tree --> Tree_Dawood
+Tree_Emad(Emad)
+Tree --> Tree_Emad
+
+</div>
+<div class="mermaid active">
+graph TD;
+Tree(Emad)
+Tree_Dawood(Dawood)
+Tree --> Tree_Dawood
+Tree_Dawood_Ahmed(Ahmed)
+Tree_Dawood --> Tree_Dawood_Ahmed
+Tree_Emad(Emad)
+Tree --> Tree_Emad
+Tree_Emad_Dawood(Dawood)
+Tree_Emad --> Tree_Emad_Dawood
+Tree_Emad_Emad(Emad)
+Tree_Emad --> Tree_Emad_Emad
+
+</div></section>
+</div>
+</body>
+</html>

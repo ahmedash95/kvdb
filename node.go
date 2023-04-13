@@ -117,6 +117,10 @@ func (n *Node) splitInternal() {
 	// now we split the current into 2 halves. and second half will be the new node
 	// the first half will be the current node
 
+	// pick the middle key and promote it to the parent node
+	midKey := n.Keys[len(n.Keys)/2]
+	parent.addKey(midKey)
+
 	sibling := n.bucket.newInternalNode()
 
 	// now we split the keys, values and children between the current node and the sibling node
@@ -135,8 +139,6 @@ func (n *Node) splitInternal() {
 	sibling.parent = n.parent
 	// the parent node must have the sibling node as a child
 	parent.addChild(sibling.pgid)
-	// and also parent node to have the sibling node's key as a key
-	parent.addKey(sibling.Keys[0])
 
 	// as we have split the keys, sibling node children must be updated
 	//to have the sibling node as a parent
@@ -156,7 +158,12 @@ func (n *Node) addChild(pgid uint64) {
 		return bytes.Compare(currentNode.Keys[0], newNode.Keys[0]) != -1
 	})
 
-	n.children = append(n.children[:i], append([]uint64{pgid}, n.children[i:]...)...)
+	newChildren := make([]uint64, len(n.children)+1)
+	copy(newChildren, n.children[:i])
+	newChildren[i] = pgid
+	copy(newChildren[i+1:], n.children[i:])
+
+	n.children = newChildren
 }
 
 func (n *Node) addKey(key []byte) {
@@ -199,6 +206,23 @@ func (n *Node) splitTwoChildren() ([]uint64, []uint64) {
 	copy(right, n.children[mid:])
 
 	return left, right
+}
+
+func (n *Node) scan(f func(key []byte, value []byte) bool) {
+	if n.typ == NODE_TYPE_LEAF {
+		for i := 0; i < len(n.Keys); i++ {
+			if !f(n.Keys[i], n.values[i]) {
+				return
+			}
+		}
+
+		return
+	}
+
+	// scan all children of the internal node
+	for i := 0; i < len(n.children); i++ {
+		n.bucket.node(n.children[i]).scan(f)
+	}
 }
 
 func newNode(b *Bucket, pgid uint64, typ uint8) *Node {

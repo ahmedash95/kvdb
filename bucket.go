@@ -1,7 +1,5 @@
 package kvdb
 
-import "fmt"
-
 type Bucket struct {
 	db    *DB
 	root  uint64
@@ -30,7 +28,6 @@ func (b *Bucket) Put(key []byte, value []byte) error {
 	}
 
 	// insert key and value
-	fmt.Printf("inserting key %s into node %d\n", key, node.pgid)
 	node.insert(key, value)
 
 	// if node is full, split it
@@ -38,6 +35,9 @@ func (b *Bucket) Put(key []byte, value []byte) error {
 	// but for now, we will keep it here
 	for i := len(cursor.stack) - 1; i >= 0; i-- {
 		// split every node that is full in the stack
+		if b.db.CallOnSplit != nil {
+			b.db.CallOnSplit()
+		}
 		cursor.stack[i].split()
 	}
 	//node.split()
@@ -100,4 +100,8 @@ func (b *Bucket) newNode(parent uint64, typ uint8) *Node {
 	b.nodes[node.pgid] = node
 
 	return node
+}
+
+func (b *Bucket) Scan(f func(key []byte, value []byte) bool) {
+	b.node(b.root).scan(f)
 }
