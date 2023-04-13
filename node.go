@@ -37,7 +37,7 @@ func (n *Node) insert(key []byte, value []byte) {
 }
 
 func (n *Node) split() {
-	if len(n.Keys) <= MAX_KEYS_PER_NODE {
+	if len(n.Keys) <= n.bucket.db.config.maxKeysPerNode {
 		return
 	}
 

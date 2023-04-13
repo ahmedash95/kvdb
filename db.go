@@ -11,7 +11,7 @@ const (
 	// node types
 	NODE_TYPE_INTERNAL = 0x01
 	NODE_TYPE_LEAF     = 0x02
-	MAX_KEYS_PER_NODE  = 1
+	MAX_KEYS_PER_NODE  = 5
 
 	// key/value length
 	KEY_SIZE   = 100 // 100 bytes
@@ -22,22 +22,30 @@ const (
 )
 
 type DB struct {
-	file        *os.File
-	path        string
-	CallOnSplit func()
+	file   *os.File
+	path   string
+	config Config
 
 	meta *Meta
 }
 
-func Open(path string) (*DB, error) {
-	return newDB(path)
+type Config struct {
+	maxKeysPerNode int
+	callOnSplit    func()
+}
+
+func Open(path string, config *Config) (*DB, error) {
+	if config == nil {
+		config = &Config{maxKeysPerNode: 3}
+	}
+	return newDB(path, *config)
 }
 
 func (db *DB) Close() error {
 	return db.file.Close()
 }
 
-func newDB(path string) (*DB, error) {
+func newDB(path string, config Config) (*DB, error) {
 	// create file if not exists
 	file, err := os.OpenFile(path, os.O_RDWR|os.O_CREATE, 0666)
 	if err != nil {
@@ -51,8 +59,9 @@ func newDB(path string) (*DB, error) {
 	}
 
 	db := &DB{
-		file: file,
-		path: path,
+		file:   file,
+		path:   path,
+		config: config,
 	}
 
 	if fi.Size() == 0 {

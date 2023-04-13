@@ -7,7 +7,7 @@ import (
 
 func injectAndPrintMermaid(db *DB, bucket *Bucket) func() {
 	var mermaidDevs []string
-	db.CallOnSplit = func() {
+	db.config.callOnSplit = func() {
 		newMermaid := MermaidHtml(bucket)
 		// check if the new mermaid is not the same as the previous one
 		if len(mermaidDevs) > 0 && mermaidDevs[len(mermaidDevs)-1] == newMermaid {
@@ -24,7 +24,7 @@ func injectAndPrintMermaid(db *DB, bucket *Bucket) func() {
 }
 
 func TestDB(t *testing.T) {
-	db, err := Open("test.db")
+	db, err := Open("test.db", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -37,22 +37,30 @@ func TestDB(t *testing.T) {
 	if err != nil {
 		t.Fatal(err)
 	}
-
-	printBucket(bucket)
 }
 
 func TestDBInsertMultiple(t *testing.T) {
-	db, err := Open("test.db")
+	db, err := Open("test.db", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
 
 	defer db.Close()
-
 	bucket := db.Bucket("user_emails")
 
 	// names are sorted in a way to catch sorting issues if splitting is picking different keys
 	names := []string{"Ibrahim", "Gamal", "Hassan", "Camal", "Basem", "Dawood", "Emad", "Ahmed", "Fady"}
+
+	var mermaidDevs []string
+	db.config.callOnSplit = func() {
+		newMermaid := MermaidHtml(bucket)
+		// check if the new mermaid is not the same as the previous one
+		if len(mermaidDevs) > 0 && mermaidDevs[len(mermaidDevs)-1] == newMermaid {
+			return
+		}
+
+		mermaidDevs = append(mermaidDevs, newMermaid)
+	}
 
 	for _, name := range names {
 		err = bucket.Put([]byte(name), []byte(fmt.Sprintf("%s@email.com", name)))
@@ -60,10 +68,13 @@ func TestDBInsertMultiple(t *testing.T) {
 			t.Fatal(err)
 		}
 	}
+
+	mermaidDevs = append(mermaidDevs, MermaidHtml(bucket))
+	mermaidToHtml(mermaidDevs)
 }
 
 func TestDBScanRecords(t *testing.T) {
-	db, err := Open("test.db")
+	db, err := Open("test.db", nil)
 	if err != nil {
 		t.Fatal(err)
 	}
@@ -99,28 +110,6 @@ func TestDBScanRecords(t *testing.T) {
 	for i, expectedKey := range expectedKeys {
 		if expectedKey != actualKeys[i] {
 			t.Fatalf("expected key %s but got %s", expectedKey, actualKeys[i])
-		}
-	}
-}
-
-func TestDBInsertMultiple2(t *testing.T) {
-	db, err := Open("test.db")
-	if err != nil {
-		t.Fatal(err)
-	}
-
-	defer db.Close()
-
-	bucket := db.Bucket("user_emails")
-
-	// names are sorted in a way to catch sorting issues if splitting is picking different keys
-	names := []string{"Ahmed", "Dawood", "Emad"}
-	defer injectAndPrintMermaid(db, bucket)()
-
-	for _, name := range names {
-		err = bucket.Put([]byte(name), []byte(fmt.Sprintf("%s@email.com", name)))
-		if err != nil {
-			t.Fatal(err)
 		}
 	}
 }

@@ -35,8 +35,8 @@ func (b *Bucket) Put(key []byte, value []byte) error {
 	// but for now, we will keep it here
 	for i := len(cursor.stack) - 1; i >= 0; i-- {
 		// split every node that is full in the stack
-		if b.db.CallOnSplit != nil {
-			b.db.CallOnSplit()
+		if b.db.config.callOnSplit != nil {
+			b.db.config.callOnSplit()
 		}
 		cursor.stack[i].split()
 	}
