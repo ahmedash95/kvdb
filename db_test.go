@@ -113,3 +113,44 @@ func TestDBScanRecords(t *testing.T) {
 		}
 	}
 }
+
+func TestDBGet(t *testing.T) {
+	db, err := Open("test.db", nil)
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	defer db.Close()
+
+	bucket := db.Bucket("user_emails")
+
+	countryEmails := map[string]string{
+		"Zanzibar": "zanzibar@gmail.com",
+		"Algeria":  "algeria@gmail.com",
+		"Egypt":    "egypt@gmail.com",
+	}
+
+	for country, email := range countryEmails {
+		err = bucket.Put([]byte(country), []byte(email))
+		if err != nil {
+			t.Fatal(err)
+		}
+	}
+
+	for country, email := range countryEmails {
+		value, err := bucket.Get([]byte(country))
+		if err != nil {
+			t.Fatal(err)
+		}
+
+		if string(value) != email {
+			t.Fatalf("expected email %s but got %s", email, value)
+		}
+	}
+
+	// test for non existing key
+	_, err = bucket.Get([]byte("non-existing-key"))
+	if err == nil {
+		t.Fatal("expected error but got nil")
+	}
+}

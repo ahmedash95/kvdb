@@ -1,5 +1,7 @@
 package kvdb
 
+import "fmt"
+
 type Bucket struct {
 	db    *DB
 	root  uint64
@@ -104,4 +106,19 @@ func (b *Bucket) newNode(parent uint64, typ uint8) *Node {
 
 func (b *Bucket) Scan(f func(key []byte, value []byte) bool) {
 	b.node(b.root).scan(f)
+}
+
+func (b *Bucket) Get(key []byte) ([]byte, error) {
+	cursor := b.Cursor()
+
+	// get node where key should be inserted
+	node := cursor.seek(key)
+
+	// if key already exists, update value
+	// if key does not exist, the value is -1
+	if i, ok := node.findKey(key); ok {
+		return node.values[i], nil
+	}
+
+	return nil, fmt.Errorf("key not found")
 }
