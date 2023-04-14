@@ -19,6 +19,8 @@ const (
 
 	// DB_HEADER SIZE
 	DB_HEADER = 0 + META_PAGE_SIZE
+
+	FreeListSize = 32
 )
 
 type DB struct {

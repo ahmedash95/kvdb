@@ -131,8 +131,8 @@ func (b *Bucket) newInternalNode() *Node {
 	return node
 }
 
-func (b Bucket) newLeafNode() *Node {
-	node := newNode(&b, b.db.meta.getNewPageID(), NODE_TYPE_LEAF)
+func (b *Bucket) newLeafNode() *Node {
+	node := newNode(b, b.db.meta.getNewPageID(), NODE_TYPE_LEAF)
 
 	b.nodes[node.pgid] = node
 
@@ -151,4 +151,17 @@ func (b *Bucket) newNode(parent uint64, typ uint8) *Node {
 
 func (b *Bucket) Scan(f func(key []byte, value []byte) bool) {
 	b.node(b.root).scan(f)
+}
+
+func (b *Bucket) removeNode(pgid uint64) {
+	newNodes := make(map[uint64]*Node)
+	for _, node := range b.nodes {
+		if node.pgid == pgid {
+			continue
+		}
+
+		newNodes[node.pgid] = node
+	}
+
+	b.nodes = newNodes
 }

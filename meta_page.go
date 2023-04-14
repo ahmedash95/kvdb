@@ -6,10 +6,12 @@ import (
 	"sync"
 )
 
+// @todo persist freelist to disk
 type Meta struct {
-	buckets []*MetaRecord
-	pgid    uint64
-	mu      sync.Mutex
+	buckets  []*MetaRecord
+	pgid     uint64
+	freeList []uint64 // list of free pages
+	mu       sync.Mutex
 }
 
 type MetaRecord struct {
@@ -17,8 +19,23 @@ type MetaRecord struct {
 	rootpage uint64
 }
 
+func (m *Meta) addFreePage(id uint64) {
+	m.mu.Lock()
+	defer m.mu.Unlock()
+
+	m.freeList = append(m.freeList, id)
+}
+
 func (m *Meta) getNewPageID() uint64 {
 	m.mu.Lock()
+
+	if len(m.freeList) > 0 {
+		id := m.freeList[0]
+		m.freeList = m.freeList[1:]
+		m.mu.Unlock()
+		return id
+	}
+
 	m.pgid++
 	m.mu.Unlock()
 

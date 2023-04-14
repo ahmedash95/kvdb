@@ -228,20 +228,41 @@ func TestFreeList(t *testing.T) {
 
 	defer injectAndPrintMermaid(db, bucket)()
 
-	countryEmails := map[string]string{
-		"Zanzibar": "zanzibar@gmail.com",
-		"Algeria":  "algeria@gmail.com",
-		"Egypt":    "egypt@gmail.com",
+	countryZipCodes := map[string]string{
+		"Zanzibar": "12345",
+		"Algeria":  "12346",
+		"Egypt":    "12347",
+		"Germany":  "12348",
+		"France":   "12349",
+		"Spain":    "12350",
+		"Poland":   "12351",
 	}
 
-	for country, email := range countryEmails {
-		err = bucket.Put([]byte(country), []byte(email))
+	for country, zipCode := range countryZipCodes {
+		err = bucket.Put([]byte(country), []byte(zipCode))
 		if err != nil {
 			t.Fatal(err)
 		}
 	}
 
 	err = bucket.Delete([]byte("Algeria"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = bucket.Delete([]byte("Spain"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = bucket.Delete([]byte("Zanzibar"))
+	if err != nil {
+		t.Fatal(err)
+	}
+	err = bucket.Delete([]byte("Poland"))
+	if err != nil {
+		t.Fatal(err)
+	}
+
+	err = bucket.Put([]byte("Germany"), []byte("duetchland@gmail.com"))
 	if err != nil {
 		t.Fatal(err)
 	}

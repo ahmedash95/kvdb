@@ -46,11 +46,6 @@ func (n *Node) split() {
 	} else {
 		n.splitInternal()
 	}
-
-	//parent := n.bucket.node(n.parent)
-	//if len(parent.Keys) > MAX_KEYS_PER_NODE {
-	//	parent.split()
-	//}
 }
 
 func (n *Node) splitLeaf() {
@@ -93,7 +88,6 @@ func (n *Node) splitLeaf() {
 	}
 	// and also parent node to have the sibling node's key as a key
 	parent.addKey(sibling.Keys[0])
-
 }
 
 func (n *Node) splitInternal() {
@@ -251,8 +245,28 @@ func (n *Node) possibleFree(pgid uint64) {
 
 	// if the node is empty, we must remove it from the parent node
 	n.removeChild(pgid)
+	// remove from bucket cache
+	n.bucket.removeNode(pgid)
 
-	// @todo: add the node to the freelist
+	n.bucket.db.meta.addFreePage(pgid)
+
+	// if the current node (parent) has only one child, we must free it as well
+	if len(n.children) == 1 {
+		if n.parent == 0 {
+			// if the current node is the root node, we must update the root node
+			// ,and we must free its parent
+			n.bucket.root = n.children[0]
+			n.bucket.node(n.bucket.root).parent = 0
+			// now lets free the current node
+			n.children = make([]uint64, 0)
+			n.Keys = make([][]byte, 0)
+			// free the current node
+			n.bucket.db.meta.addFreePage(n.pgid)
+			n.bucket.removeNode(n.pgid)
+		} else {
+			// @todo we must free node with parent
+		}
+	}
 }
 
 func (n *Node) removeChild(pgid uint64) {
